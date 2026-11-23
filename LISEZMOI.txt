@@ -1,0 +1,7 @@
+ATC Memo - SimConnect
+---------------------
+Le suivi de vol et les alertes automatiques ont besoin de SimConnect.dll (fournie avec MSFS SDK, ou avec le module Python "SimConnect").
+Deux solutions, une seule suffit :
+  1. Copier SimConnect.dll dans  %APPDATA%\ATC-Memo   (le dossier est cree au premier lancement)
+  2. Installer Python puis :  pip install SimConnect
+Si e-NavLog a deja une SimConnect.dll dans %APPDATA%\e-NavLog, elle est trouvee toute seule.

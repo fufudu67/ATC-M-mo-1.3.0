@@ -1,0 +1,54 @@
+{
+  "name": "atc-memo",
+  "productName": "ATC Memo",
+  "version": "1.0.0",
+  "description": "Standalone ATC memo for SayIntentions.AI (flight simulation)",
+  "author": "Gauthier",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win portable"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.atcmemo.app",
+    "productName": "ATC Memo",
+    "files": [
+      "main.js",
+      "memo.js",
+      "simhelper.py",
+      "www/**",
+      "build/**",
+      "LICENSE",
+      "package.json"
+    ],
+    "win": {
+      "target": "portable",
+      "icon": "build/icon.png",
+      "signAndEditExecutable": false,
+      "forceCodeSigning": false
+    },
+    "portable": {
+      "artifactName": "ATC-Memo.exe"
+    },
+    "extraResources": [
+      {
+        "from": "vendor",
+        "to": ".",
+        "filter": [
+          "simhelper.exe",
+          "SimConnect.dll"
+        ]
+      }
+    ]
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/VOTRE-COMPTE/ATC-Memo",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/VOTRE-COMPTE/ATC-Memo.git"
+  }
+}
