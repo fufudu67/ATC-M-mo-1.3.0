@@ -40,13 +40,17 @@ app.setAppUserModelId('com.atcmemo.app');
 
 app.whenReady().then(async () => {
   const V = require('./package.json').version;
-  Menu.setApplicationMenu(Menu.buildFromTemplate([
-    { label: 'Help', submenu: [
-      { label: 'About ATC Memo', click: () => dialog.showMessageBox(win, { type: 'info', title: 'About ATC Memo', message: 'ATC Memo ' + V,
-          detail: 'Memo for SayIntentions.AI on Microsoft Flight Simulator.\nCreated by fullenwarth. MIT licence.\n\nUnofficial software: not affiliated with or endorsed by SayIntentions.AI, Microsoft or Asobo Studio. All trademarks belong to their owners.' }) },
-      { label: 'Open data folder', click: () => shell.openPath(DATA_DIR) },
+  const memo = MEMO.memo, T = (x, ...a) => memo.T(x, ...a);
+  try { memo.sysLang = app.getLocale() || 'fr'; } catch (e) {}
+  const buildMenu = () => Menu.setApplicationMenu(Menu.buildFromTemplate([
+    { label: T('Aide'), submenu: [
+      { label: T('À propos d’ATC Memo'), click: () => dialog.showMessageBox(win, { type: 'info', title: T('À propos d’ATC Memo'), message: 'ATC Memo ' + V,
+          detail: T('Mémo pour SayIntentions.AI sur Microsoft Flight Simulator.\nCréé par fullenwarth. Licence MIT.\n\nLogiciel non officiel : non affilié à SayIntentions.AI, Microsoft ou Asobo Studio, ni approuvé par eux. Toutes les marques appartiennent à leurs propriétaires.') }) },
+      { label: T('Ouvrir le dossier des données'), click: () => shell.openPath(DATA_DIR) },
     ] },
   ]));
+  buildMenu();
+  memo.onLang = buildMenu;
   let port;
   try { port = await startServer(); } catch (e) { dialog.showErrorBox('ATC Memo', 'ATC Memo could not start: ' + e.message); app.quit(); return; }
   win = new BrowserWindow({

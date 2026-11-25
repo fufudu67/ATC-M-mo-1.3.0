@@ -52,7 +52,7 @@ button.ghost:hover{border-color:var(--line);color:var(--ink)}
 .win .sub{font:500 12.5px system-ui;color:#9fb0c4;min-height:1.3em}
 .win.empty .val{color:#2a3b52;text-shadow:none}
 .win.alert{border-color:var(--amb);animation:glow 1.1s ease-in-out infinite;cursor:pointer}
-.win.alert .lab::after{content:"Nouveau";background:var(--amb);color:#1b1200;border-radius:6px;padding:0 7px;font-size:11.5px;font-weight:700}
+.win.alert .lab::after{content:var(--new,"Nouveau");background:var(--amb);color:#1b1200;border-radius:6px;padding:0 7px;font-size:11.5px;font-weight:700}
 .sub.bad{color:var(--bad)}
 
 /* radio and weather row */
@@ -153,9 +153,9 @@ mark.hd{background:#5ad1e6}mark.al{background:#ffb43c}mark.sp{background:#c9a7ff
   <div class="scroll">
     <div class="banner" id="banner"></div>
     <div class="board" id="grid"></div>
-    <details open data-k="trk"><summary>Suivi du vol</summary><div class="trk" id="trk"></div></details>
-    <details open data-k="pad"><summary>Scratchpad</summary><textarea id="pad" rows="4" placeholder="Notes de vol…"></textarea></details>
-    <details open data-k="hist"><summary>Échanges <small id="hcount"></small></summary><ul class="hist" id="hist"></ul></details>
+    <details open data-k="trk"><summary><span data-t="Suivi du vol">Suivi du vol</span></summary><div class="trk" id="trk"></div></details>
+    <details open data-k="pad"><summary><span data-t="Scratchpad">Scratchpad</span></summary><textarea id="pad" rows="4" data-tp="Notes de vol…" placeholder="Notes de vol…"></textarea></details>
+    <details open data-k="hist"><summary><span data-t="Échanges">Échanges</span> <small id="hcount"></small></summary><ul class="hist" id="hist"></ul></details>
   </div>
   <div class="modal" id="modal"><div class="card" id="card"></div></div>
 </div>`;
@@ -164,6 +164,22 @@ mark.hd{background:#5ad1e6}mark.al{background:#ffb43c}mark.sp{background:#c9a7ff
   const api = (p, o) => fetch(p, o).then(r => r.json());
   const post = (p, b) => api(p, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b || {}) });
   let S = null, skew = 0, open = false, sig = '', first = true, ac = null, launcher = [], isLocal = false;
+
+  /* ---------- langue ---------- */
+  let lang = 'fr';
+  try { lang = localStorage.getItem('memo_lang') || 'fr'; } catch (e) {}
+  const T = (s, ...a) => (window.ATC_I18N ? window.ATC_I18N.tr(lang, s, ...a) : s);
+  function applyLang() {
+    root.querySelectorAll('[data-t]').forEach(el => { el.textContent = T(el.dataset.t); });
+    root.querySelectorAll('[data-tp]').forEach(el => { el.placeholder = T(el.dataset.tp); });
+    $('panel').style.setProperty('--new', JSON.stringify(T('Nouveau')));
+    try { document.documentElement.lang = lang; } catch (e) {}
+  }
+  function setLang(l) {
+    if (!l || l === lang) return;
+    lang = l; try { localStorage.setItem('memo_lang', l); } catch (e) {}
+    applyLang(); renderBar(); tick();
+  }
 
   /* ---------- ouverture / fermeture ---------- */
   /* the panel fills the screen up to e-NavLog's side banner (or down to its bottom bar on a narrow screen) */
@@ -207,7 +223,7 @@ mark.hd{background:#5ad1e6}mark.al{background:#ffb43c}mark.sp{background:#c9a7ff
   root.querySelectorAll('details').forEach(d => { if (sec[d.dataset.k] === false) d.open = false; d.addEventListener('toggle', () => { sec[d.dataset.k] = d.open; localStorage.setItem('memo_sec', JSON.stringify(sec)); }); });
 
   /* ---------- affichage ---------- */
-  const ago = t => { const s = (Date.now() - skew - Date.parse(t)) / 1000; if (!(s >= 0)) return ''; return s < 90 ? 'à l’instant' : s < 3600 ? 'il y a ' + Math.round(s / 60) + ' min' : 'il y a ' + Math.floor(s / 3600) + ' h ' + Math.round(s % 3600 / 60) + ' min'; };
+  const ago = t => { const s = (Date.now() - skew - Date.parse(t)) / 1000; if (!(s >= 0)) return ''; return s < 90 ? T('à l’instant') : s < 3600 ? T('il y a {0} min', Math.round(s / 60)) : T('il y a {0} h {1} min', Math.floor(s / 3600), Math.round(s % 3600 / 60)); };
   const hms = s => { s = Math.floor(s) % 86400; const p = n => String(n).padStart(2, '0'); return p(Math.floor(s / 3600)) + ':' + p(Math.floor(s % 3600 / 60)) + ':' + p(s % 60); };
   function mark(text, spans) {
     let out = '', pos = 0;
@@ -223,7 +239,7 @@ mark.hd{background:#5ad1e6}mark.al{background:#ffb43c}mark.sp{background:#c9a7ff
   const cell = t => `<div class="cell${cls(t)}" style="--c:${t.color}"><div class="lab">${lab(t)}</div>${t.k === 'sqk' && /^\d{4}$/.test(t.v) ? `<div class="sqd">${t.v.split('').map(d => `<i>${d}</i>`).join('')}</div>` : `<div class="val">${esc(t.v)}</div>`}<div class="sub${t.bad ? ' bad' : ''}">${subOf(t)}</div></div>`;
   const rwy = t => `<div class="rwy${t.empty ? ' empty' : ''}"><div class="lab">${lab(t)}</div><div class="val">${esc(t.v)}</div><div class="sub">${subOf(t)}</div></div>`;
   const dct = t => `<div class="dct${t.empty ? ' empty' : ''}" style="--c:${t.color}"><div class="lab">${lab(t)}</div><div class="val">${esc(t.v)}</div><div class="sub">${subOf(t)}</div></div>`;
-  const sign = t => `<div class="sign${t.empty ? ' empty' : ''}${t.inactive ? ' off' : ''}"><span class="lab">${lab(t)}</span><div class="val">${esc(t.inactive ? 'Inactif : avion en vol' : t.empty ? 'Pas encore donné' : t.v)}</div></div>`;
+  const sign = t => `<div class="sign${t.empty ? ' empty' : ''}${t.inactive ? ' off' : ''}"><span class="lab">${lab(t)}</span><div class="val">${esc(t.inactive ? T('Inactif : avion en vol') : t.empty ? T('Pas encore donné') : t.v)}</div></div>`;
   function clrBox(t) {
     const rows = [], lines = String(t.v || '').split('\n');
     let last = '';
@@ -236,7 +252,7 @@ mark.hd{background:#5ad1e6}mark.al{background:#ffb43c}mark.sp{background:#c9a7ff
       const kind = ic === '✔' ? 'ok' : ic === '…' ? 'wait' : 'oth';
       rows.push(`<div class="cl ${kind}"><span class="ic">${ic === '✔' ? '✓' : ic === '…' ? '…' : '•'}</span><span class="k">${esc(body.slice(0, p))}</span><span class="v">${esc(body.slice(p + 3))}</span></div>`);
     });
-    return `<div class="clr${t.alert ? ' alert' : ''}${t.empty ? ' empty' : ''}"><h4>Autorisations et procédures<span>${t.t ? ago(t.t) : ''}</span></h4>${rows.join('') || (t.empty ? '<div class="none">Pas encore donné.</div>' : '')}${last ? `<div class="last">${esc(last)}</div>` : ''}</div>`;
+    return `<div class="clr${t.alert ? ' alert' : ''}${t.empty ? ' empty' : ''}"><h4>${esc(T('Autorisations et procédures'))}<span>${t.t ? ago(t.t) : ''}</span></h4>${rows.join('') || (t.empty ? '<div class="none">' + esc(T('Pas encore donné.')) + '</div>' : '')}${last ? `<div class="last">${esc(last)}</div>` : ''}</div>`;
   }
   function board(T) {
     const by = {}; T.forEach(t => by[t.k] = t);
@@ -255,37 +271,38 @@ ${by.clr ? clrBox(by.clr) : ''}${by.push ? sign(by.push) : ''}${by.tax && !by.ta
       const P = S.progress || { lines: [], frac: 0, marks: [] }, nx = P.lines.find(l => l.tag === 'next'), t = $('trk');
       if (!nx) {
         const m = P.lines.filter(l => l.tag === 'sys' && l.text).map(l => esc(l.label + l.text));
-        t.innerHTML = '<div class="sys">' + (m.join('<br>') || 'Pas de plan de vol.') + '</div>';
+        t.innerHTML = '<div class="sys">' + (m.join('<br>') || esc(T('Pas de plan de vol.'))) + '</div>';
       } else {
         const dist = l => (l.cols.length === 1 ? -1 : l.tag === 'arr' ? 1e9 : parseFloat(l.cols[1]) || 1e8);
         const rows = P.lines.filter(l => l.cols && l !== nx).sort((a, b) => dist(a) - dist(b)).map(l => {
           const c = l.cols, pass = c.length === 1;
-          return `<div class="rw${pass ? ' pass' : ''}"><b>${esc(l.tag === 'arr' ? 'Arrivée' : (l.label || c[0]))}</b><span>${esc(pass ? 'passé' : c[1] || '')}</span><span>${esc(pass ? '' : c[2] || '')}</span></div>`;
+          return `<div class="rw${pass ? ' pass' : ''}"><b>${esc(l.tag === 'arr' ? T('Arrivée') : (l.label || c[0]))}</b><span>${esc(pass ? c[0] : c[1] || '')}</span><span>${esc(pass ? '' : c[2] || '')}</span></div>`;
         }).join('');
-        t.innerHTML = `<div class="nx"><span class="k">Prochain point</span><span class="id">${esc(nx.cols[0])}</span><span class="m">${esc(nx.cols[1])}</span><span class="m">${esc(nx.cols[2])}<small>ETA</small></span></div>`
+        t.innerHTML = `<div class="nx"><span class="k">${esc(T('Prochain point'))}</span><span class="id">${esc(nx.cols[0])}</span><span class="m">${esc(nx.cols[1])}</span><span class="m">${esc(nx.cols[2])}<small>ETA</small></span></div>`
           + `<div class="tb"><i style="width:${(P.frac * 100).toFixed(1)}%"></i>${P.marks.map(([f, n]) => `<u style="left:${(f * 100).toFixed(1)}%"></u><s style="left:${(f * 100).toFixed(1)}%">${esc(n)}</s>`).join('')}</div>` + rows;
       }
     } catch (e) { console.error('[atc] suivi', e); }
     const al = S.tiles.filter(t => t.alert), bn = $('banner');
-    if (al.length) { bn.style.display = 'block'; bn.innerHTML = esc(al.map(t => (t.k === 'clr' ? 'Autorisation' : t.label.split('  (')[0].replace(' suivante', '')) + (t.k === 'clr' && !t.short ? '' : ' ' + (t.short || t.v))).join(' · ')) + '<small>Nouvelle instruction : touchez pour valider</small>'; } else bn.style.display = 'none';
+    if (al.length) { bn.style.display = 'block'; bn.innerHTML = esc(al.map(t => (t.k === 'clr' ? T('Autorisation') : t.k === 'frq' ? T('Fréquence') : t.label.split('  (')[0]) + (t.k === 'clr' && !t.short ? '' : ' ' + (t.short || t.v))).join(' · ')) + '<small>' + esc(T('Nouvelle instruction : touchez pour valider')) + '</small>'; } else bn.style.display = 'none';
     $('fab').classList.toggle('alert', al.length > 0);
     try { window.dispatchEvent(new CustomEvent('enl-atc', { detail: { alert: al.length > 0 } })); } catch (e) {}
-    $('hist').innerHTML = S.hist.length ? S.hist.map(m => `<li>${m.pil ? `<div class="pil">${esc(m.pil)}</div>` : ''}${m.atc ? `<div class="atc">${mark(m.atc, m.spans)}</div>` : ''}<div class="meta">${esc(m.who)}${m.freq ? ' · ' + esc(m.freq) : ''} · ${esc((m.t || '').slice(11, 16))} Z</div></li>`).join('') : '<li class="none">Aucun échange pour l’instant.</li>';
-    const hc = $('hcount'); if (hc) hc.textContent = S.hist.length ? S.hist.length + ' messages' : '';
+    $('hist').innerHTML = S.hist.length ? S.hist.map(m => `<li>${m.pil ? `<div class="pil">${esc(m.pil)}</div>` : ''}${m.atc ? `<div class="atc">${mark(m.atc, m.spans)}</div>` : ''}<div class="meta">${esc(m.who)}${m.freq ? ' · ' + esc(m.freq) : ''} · ${esc((m.t || '').slice(11, 16))} Z</div></li>`).join('') : '<li class="none">' + esc(T('Aucun échange pour l’instant.')) + '</li>';
+    const hc = $('hcount'); if (hc) hc.textContent = S.hist.length ? T('{0} messages', S.hist.length) : '';
     renderBar();
   }
   function renderBar() {
     const f = S ? S.flight : { orig: '', dest: '' };
     const pins = launcher.map((e, i) => e.pin ? `<button data-l="${i}">${esc(e.name)}</button>` : '').join('');
     const I = { atis: '<svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 16 0"/><path d="M7.5 12a4.5 4.5 0 0 1 9 0"/><circle cx="12" cy="12" r="1.2"/><path d="M12 13v7"/></svg>', chart: '<svg viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></svg>', app: '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>', cog: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></svg>' };
-    $('bar').innerHTML = `<button class="pri" data-a="atis1">${I.atis}ATIS ${esc(f.orig || 'départ')}</button><button class="pri" data-a="atis0">${I.atis}ATIS ${esc(f.dest || 'arrivée')}</button><button class="pri" data-a="ch1">${I.chart}Charts ${esc(f.orig || 'départ')}</button><button class="pri" data-a="ch0">${I.chart}Charts ${esc(f.dest || 'arrivée')}</button>${pins}<span class="sp"></span><button class="ghost" data-a="launcher">${I.app}Lanceur</button><button class="ghost" data-a="settings">${I.cog}Réglages</button><button class="ghost" data-a="close">✕ Fermer</button>`;
+    const o = f.orig || T('départ'), d = f.dest || T('arrivée');
+    $('bar').innerHTML = `<button class="pri" data-a="atis1">${I.atis}ATIS ${esc(o)}</button><button class="pri" data-a="atis0">${I.atis}ATIS ${esc(d)}</button><button class="pri" data-a="ch1">${I.chart}${esc(T('Charts {0}', o))}</button><button class="pri" data-a="ch0">${I.chart}${esc(T('Charts {0}', d))}</button>${pins}<span class="sp"></span><button class="ghost" data-a="launcher">${I.app}${esc(T('Lanceur'))}</button><button class="ghost" data-a="settings">${I.cog}${esc(T('Réglages'))}</button><button class="ghost" data-a="close">✕ ${esc(T('Fermer'))}</button>`;
   }
   function tick() {
     const c = $('clock');
     if (S && S.sim && S.sim.zulu != null) {
       const dt = (Date.now() - skew - S.sim.at) / 1000;
-      c.textContent = 'UTC ' + hms(S.sim.zulu + dt) + (S.sim.local != null ? '   Local avion ' + hms(S.sim.local + dt) : '') + '  (sim)';
-    } else { const n = new Date(); c.textContent = 'UTC ' + n.toISOString().slice(11, 19) + '   Heure PC ' + n.toTimeString().slice(0, 8); }
+      c.textContent = 'UTC ' + hms(S.sim.zulu + dt) + (S.sim.local != null ? '   ' + T('Local avion') + ' ' + hms(S.sim.local + dt) : '') + '  (sim)';
+    } else { const n = new Date(); c.textContent = 'UTC ' + n.toISOString().slice(11, 19) + '   ' + T('Heure PC') + ' ' + n.toTimeString().slice(0, 8); }
     /* embedded as a tab: the same text is also shown at the top right of the app bar (see #atcNavClock) */
     try { const nc = document.getElementById('atcNavClock'); if (nc) nc.textContent = c.textContent.replace(/\s{2,}/g, ' · '); } catch (e) {}
   }
@@ -296,11 +313,12 @@ ${by.clr ? clrBox(by.clr) : ''}${by.push ? sign(by.push) : ''}${by.tax && !by.ta
     try {
       S = await api('/api/memo/state');
       skew = Date.now() - S.now;
+      if (S.lang) setLang(S.lang);
       const s2 = S.tiles.filter(t => t.alert).map(t => t.k + t.v + t.t).join('|');
       if (!first && s2 && s2 !== sig && S.cfg.beep) beep();
       sig = s2; first = false;
       render();
-    } catch (e) { console.error('[atc]', e); $('stat').textContent = 'e-NavLog ne répond pas…'; }
+    } catch (e) { console.error('[atc]', e); $('stat').textContent = T('e-NavLog ne répond pas…'); }
   }
   setInterval(() => poll(), 1500);
   setInterval(tick, 1000);
@@ -319,32 +337,35 @@ ${by.clr ? clrBox(by.clr) : ''}${by.push ? sign(by.push) : ''}${by.tax && !by.ta
   $('modal').onclick = e => { if (e.target === $('modal')) closeModal(); };
 
   async function showAtis(dep) {
-    modal('<h3>ATIS</h3><div class="atis">Chargement…</div>');
+    modal('<h3>ATIS</h3><div class="atis">' + esc(T('Chargement…')) + '</div>');
     const r = await api('/api/memo/atis?dep=' + (dep ? 1 : 0));
-    modal(`<h3>ATIS ${dep ? 'départ' : 'arrivée'}${r.icao ? ' · ' + esc(r.icao) : ''}${r.info ? ` <span class="ainfo">INFO ${esc(r.info)}</span>` : ''}</h3><div class="atis">${esc(r.error || r.atis)}</div>${r.runway ? `<div class="meta">Piste en service : ${esc(r.runway)}</div>` : ''}${r.metar ? `<div class="meta">${esc(r.metar)}</div>` : ''}<p><button data-a="x">Fermer</button></p>`);
+    modal(`<h3>ATIS ${esc(T(dep ? 'départ' : 'arrivée'))}${r.icao ? ' · ' + esc(r.icao) : ''}${r.info ? ` <span class="ainfo">INFO ${esc(r.info)}</span>` : ''}</h3><div class="atis">${esc(r.error || r.atis)}</div>${r.runway ? `<div class="meta">${esc(T('Piste en service : {0}', r.runway))}</div>` : ''}${r.metar ? `<div class="meta">${esc(r.metar)}</div>` : ''}<p><button data-a="x">${esc(T('Fermer'))}</button></p>`);
   }
   async function showSettings() {
     const c = await api('/api/memo/settings');
-    modal(`<h3>Réglages ATC</h3>${c.local ? '' : '<div class="meta">Les réglages se modifient depuis le PC uniquement.</div>'}
-<label>Clé développeur SayIntentions${c.hasKey ? ' (déjà enregistrée : laissez vide pour la garder)' : ''}</label><input id="s_key" type="password" autocomplete="off">
-<label>Adresse du PC SayIntentions (localhost si c’est ce PC)</label><input id="s_host" value="${esc(c.host)}">
-<label>Identifiant SimBrief (pseudo ou numéro de pilote)</label><input id="s_sb" value="${esc(c.sb)}">
-<label>Adresse de Navigraph Charts</label><input id="s_ng" value="${esc(c.ng)}">
-<label>Communications à afficher dans les échanges</label><select id="s_mode"><option value="atc"${c.mode === 'atc' ? ' selected' : ''}>Radio ATC (vous + ATC), sans équipage</option><option value="all"${c.mode === 'all' ? ' selected' : ''}>Tout, équipage compris</option></select>
-<label><input id="s_beep" type="checkbox" style="width:auto"${c.beep ? ' checked' : ''}> Bip à chaque nouvelle instruction</label>
-<p><button class="pri" data-a="save">Enregistrer</button> <button data-a="x">Annuler</button></p>`);
+    const langs = c.langs || (window.ATC_I18N ? window.ATC_I18N.LANGS : []), cur = c.lang || 'auto';
+    const opt = (v, txt, sel) => `<option value="${esc(v)}"${sel ? ' selected' : ''}>${esc(txt)}</option>`;
+    modal(`<h3>${esc(T('Réglages ATC'))}</h3>${c.local ? '' : `<div class="meta">${esc(T('Les réglages se modifient depuis le PC uniquement.'))}</div>`}
+<label>${esc(T('Langue'))}${T('Langue') === 'Language' ? '' : ' · Language'}</label><select id="s_lang">${opt('auto', T('Automatique (langue du système)'), cur === 'auto')}${langs.map(([code, name]) => opt(code, name, cur === code)).join('')}</select>
+<label>${esc(T('Clé développeur SayIntentions'))}${c.hasKey ? esc(T(' (déjà enregistrée : laissez vide pour la garder)')) : ''}</label><input id="s_key" type="password" autocomplete="off">
+<label>${esc(T('Adresse du PC SayIntentions (localhost si c’est ce PC)'))}</label><input id="s_host" value="${esc(c.host)}">
+<label>${esc(T('Identifiant SimBrief (pseudo ou numéro de pilote)'))}</label><input id="s_sb" value="${esc(c.sb)}">
+<label>${esc(T('Adresse de Navigraph Charts'))}</label><input id="s_ng" value="${esc(c.ng)}">
+<label>${esc(T('Communications à afficher dans les échanges'))}</label><select id="s_mode">${opt('atc', T('Radio ATC (vous + ATC), sans équipage'), c.mode === 'atc')}${opt('all', T('Tout, équipage compris'), c.mode === 'all')}</select>
+<label><input id="s_beep" type="checkbox" style="width:auto"${c.beep ? ' checked' : ''}> ${esc(T('Bip à chaque nouvelle instruction'))}</label>
+<p><button class="pri" data-a="save">${esc(T('Enregistrer'))}</button> <button data-a="x">${esc(T('Annuler'))}</button></p>`);
   }
   async function showLauncher() {
     const r = await api('/api/memo/launcher'); launcher = r.list; isLocal = r.local; renderBar();
-    modal(`<h3>Lanceur d’applications</h3><div class="meta">Auto : lancée à chaque démarrage de l’application. Barre : bouton dans la barre du haut.</div>
-${launcher.map((e, i) => `<div class="lrow"><span>${esc(e.name)}</span><label><input type="checkbox" data-u="${i}" data-f="auto" style="width:auto"${e.auto ? ' checked' : ''}> Auto</label><label><input type="checkbox" data-u="${i}" data-f="pin" style="width:auto"${e.pin ? ' checked' : ''}> Barre</label><button data-l="${i}">Lancer</button><button data-d="${i}">✕</button></div>`).join('')}
-${r.local ? `<label>Ajouter une application (chemin du programme ou du raccourci)</label><div class="lrow"><input id="l_path" placeholder="C:\\Program Files\\…\\programme.exe"><button data-a="browse">Parcourir…</button></div><div class="lrow"><input id="l_name" placeholder="Nom à afficher"><button class="pri" data-a="add">Ajouter</button></div>` : '<div class="meta">Le lanceur se gère depuis le PC uniquement.</div>'}
-<p><button data-a="launchAll">Tout lancer</button> <button data-a="x">Fermer</button></p>`);
+    modal(`<h3>${esc(T('Lanceur d’applications'))}</h3><div class="meta">${esc(T('Auto : lancée à chaque démarrage de l’application. Barre : bouton dans la barre du haut.'))}</div>
+${launcher.map((e, i) => `<div class="lrow"><span>${esc(e.name)}</span><label><input type="checkbox" data-u="${i}" data-f="auto" style="width:auto"${e.auto ? ' checked' : ''}> Auto</label><label><input type="checkbox" data-u="${i}" data-f="pin" style="width:auto"${e.pin ? ' checked' : ''}> ${esc(T('Barre'))}</label><button data-l="${i}">${esc(T('Lancer'))}</button><button data-d="${i}">✕</button></div>`).join('')}
+${r.local ? `<label>${esc(T('Ajouter une application (chemin du programme ou du raccourci)'))}</label><div class="lrow"><input id="l_path" placeholder="C:\\Program Files\\…\\programme.exe"><button data-a="browse">${esc(T('Parcourir…'))}</button></div><div class="lrow"><input id="l_name" placeholder="${esc(T('Nom à afficher'))}"><button class="pri" data-a="add">${esc(T('Ajouter'))}</button></div>` : `<div class="meta">${esc(T('Le lanceur se gère depuis le PC uniquement.'))}</div>`}
+<p><button data-a="launchAll">${esc(T('Tout lancer'))}</button> <button data-a="x">${esc(T('Fermer'))}</button></p>`);
   }
   const copyAndOpen = dep => {
     const icao = S && S.flight[dep ? 'orig' : 'dest'];
     if (icao && navigator.clipboard) navigator.clipboard.writeText(icao).catch(() => {});
-    $('stat').textContent = icao ? icao + ' copié : collez-le dans la recherche de Navigraph' : 'Aucun vol en cours : cherchez l’aéroport dans Navigraph';
+    $('stat').textContent = icao ? T('{0} copié : collez-le dans la recherche de Navigraph', icao) : T('Aucun vol en cours : cherchez l’aéroport dans Navigraph');
     /* same behaviour as the Charts tab: window inside the PC app, installed app on Android / iPad (Shortcut) */
     if (typeof window.__enlNg === 'function') window.__enlNg(); else window.open((S && S.cfg.ng) || 'https://charts.navigraph.com', '_blank');
   };
@@ -361,7 +382,7 @@ ${r.local ? `<label>Ajouter une application (chemin du programme ou du raccourci
     else if (a === 'settings') showSettings();
     else if (a === 'launcher') showLauncher();
     else if (a === 'save') {
-      const r = await post('/api/memo/settings', { key: $('s_key').value, host: $('s_host').value, sb: $('s_sb').value, ng: $('s_ng').value, mode: $('s_mode').value, beep: $('s_beep').checked });
+      const r = await post('/api/memo/settings', { key: $('s_key').value, host: $('s_host').value, sb: $('s_sb').value, ng: $('s_ng').value, mode: $('s_mode').value, beep: $('s_beep').checked, lang: $('s_lang').value });
       if (r.error) alert(r.error); else { closeModal(); poll(); }
     } else if (a === 'browse') { const r = await post('/api/memo/launcher', { action: 'browse' }); if (r.path) $('l_path').value = r.path; }
     else if (a === 'add') { const p = $('l_path').value.trim(); if (p) { await post('/api/memo/launcher', { action: 'add', path: p, name: $('l_name').value.trim() }); showLauncher(); } }
@@ -374,6 +395,6 @@ ${r.local ? `<label>Ajouter une application (chemin du programme ou du raccourci
   });
 
   api('/api/memo/launcher').then(r => { launcher = r.list; isLocal = r.local; renderBar(); }).catch(() => {});
-  tick(); poll();
+  applyLang(); tick(); poll();
   window.dispatchEvent(new Event('enl-atc-ready'));
 })();

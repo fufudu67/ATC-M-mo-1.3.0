@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const { exec, spawn } = require('child_process');
+const I18N = require('./www/i18n.js');
 
 const SAPI = process.env.MEMO_SAPI_BASE || 'https://apipri.sayintentions.ai/sapi/';
 const ALERT = { hdg: 'Cap', alt: 'Altitude', spd: 'Vitesse', sqk: 'Squawk', frq: 'Fréquence', dct: 'Direct', clr: 'Autorisation' };
@@ -232,15 +233,21 @@ class Memo {
   constructor(dataDir) {
     this.dir = dataDir;
     this.file = path.join(dataDir, 'memo.json');
-    this.cfg = Object.assign({ key: '', host: 'localhost', sb: '', mode: 'atc', beep: false, ng: 'https://charts.navigraph.com', launch: [] }, this.readJson(this.file));
+    this.cfg = Object.assign({ key: '', host: 'localhost', sb: '', mode: 'atc', beep: false, ng: 'https://charts.navigraph.com', launch: [], lang: 'auto' }, this.readJson(this.file));
+    this.sysLang = 'fr';
     this.status = ['Démarrage…', 0];
     this.fid = null; this.sim = null; this.simAt = 0; this.simMsg = '';
     this.reset();
   }
+  /* --- langue de l'interface --- */
+  lang() { return I18N.resolve(this.cfg.lang, this.sysLang); }
+  T(s, ...a) { return I18N.tr(this.lang(), s, ...a); }
+  P(s) { return I18N.trParts(this.lang(), s); }
+  sep() { return this.lang() === 'fr' ? ' : ' : ': '; }
   readJson(f) { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch (e) { return {}; } }
   save() { try { fs.mkdirSync(this.dir, { recursive: true }); fs.writeFileSync(this.file, JSON.stringify(this.cfg, null, 1)); } catch (e) { /* ignoré */ } }
   reset() {
-    Object.assign(this, { S: {}, hist: [], lid: 0, live: false, clr: {}, raw: [], lastCl: '', wx: {}, wxAt: 0, lastAp: '', siPlan: null, changes: [],
+    Object.assign(this, { S: {}, hist: [], lid: 0, live: false, clr: {}, raw: [], lastCl: null, wx: {}, wxAt: 0, lastAp: '', siPlan: null, changes: [],
       ofp: null, pts: [], trans: null, tOff: null, tOn: null, ofpAt: 0, ofpOk: false, wxFetchAt: 0, info: this.info || {}, api: '' });
   }
   utcSecs() {
@@ -259,7 +266,7 @@ class Memo {
       if (!c.key) { this.status = ['Clé développeur SayIntentions manquante : ouvrez les réglages ATC.', 1]; return; }
       let fj;
       try { fj = await jget('http://' + (c.host || 'localhost') + ':43117/flightJSON', {}, 4000); }
-      catch (e) { this.status = ['SayIntentions injoignable sur ' + c.host + ':43117 (client lancé ?)', 1]; return; }
+      catch (e) { this.status = ['SayIntentions injoignable sur {0}:43117 (client lancé ?)', 1, c.host]; return; }
       const f = fj.flight_details || {};
       if (!f.api_key) { this.status = ['En attente d’un vol…', 0]; return; }
       if (f.flight_id !== this.fid) { this.fid = f.flight_id; this.reset(); }
@@ -279,8 +286,8 @@ class Memo {
         const ic = [...new Set([this.info.orig, this.info.dest].filter(Boolean))].join(',');
         if (ic) { const w = await this.sapi('getWX', { icao: ic }); (w.airports || []).forEach(a => { this.wx[a.airport] = a; }); this.wxAt = Date.now(); this.wxFetchAt = Date.now(); }
       }
-      this.status = ['Connecté · ' + new Date().toLocaleTimeString('fr-FR'), 0];
-    } catch (e) { this.status = ['Erreur réseau : ' + e.message, 1]; }
+      this.status = ['Connecté · {0}', 0, new Date().toLocaleTimeString(this.lang())];
+    } catch (e) { this.status = ['Erreur réseau : {0}', 1, e.message]; }
   }
   start() {
     const loop = async () => { await this.tick(); this.timer = setTimeout(loop, 5000); };
@@ -323,13 +330,13 @@ class Memo {
     const born = stampMs(t);
     if (cat === '*') {
       if (this.raw.some(r => r.v === v)) return;
-      this.raw = this.raw.concat([{ v, st, t, born }]).slice(-2); this.lastCl = v.slice(0, 70);
+      this.raw = this.raw.concat([{ v, st, t, born }]).slice(-2); this.lastCl = { v: v.slice(0, 70) };
     } else {
       const old = this.clr[cat];
       if (old && old.v === v && old.st === st) return;
       for (const c of (SUPERSEDE[cat] || [])) delete this.clr[c];
       if (cat === 'Approche' && st === 'autorisé') delete this.clr['SID'];
-      this.clr[cat] = { v, st, t, born }; this.lastCl = (cat + ' ' + v).trim();
+      this.clr[cat] = { v, st, t, born }; this.lastCl = { cat, v };
     }
     this.S.clr = { v: '', sub: '', t, ack: !this.live };
   }
@@ -344,17 +351,19 @@ class Memo {
   clrText() {
     this.pruneClr();
     const L = [];
-    for (const c of CLR_ORDER) { const e = this.clr[c]; if (e) L.push((e.st === 'autorisé' ? '✔' : e.st === 'attendu' ? '…' : '•') + ' ' + c + ' : ' + e.v + (e.st === 'attendu' ? '  (attendu)' : '')); }
+    for (const c of CLR_ORDER) { const e = this.clr[c]; if (e) L.push((e.st === 'autorisé' ? '✔' : e.st === 'attendu' ? '…' : '•') + ' ' + this.T(c) + ' : ' + this.clrVal(e.v) + (e.st === 'attendu' ? '  (' + this.T('attendu') + ')' : '')); }
     if (this.raw.length) { const r = this.raw[this.raw.length - 1]; L.push('', (r.st === 'autorisé' ? '→ ' : '… ') + r.v); }
     return L.join('\n') || '—';
   }
+  clrVal(v) { return String(v || '').replace(/^piste /, this.T('piste') + ' '); }
+  shortCl() { const l = this.lastCl; if (!l) return ''; return l.cat ? (this.T(l.cat) + ' ' + this.clrVal(l.v)).trim() : l.v; }
   trackPlan() {
     const cf = this.info.cf || {};
     const nw = { 'piste départ': cf.flight_plan_departing_runway, 'SID': cf.flight_plan_sid, 'piste arrivée': cf.flight_plan_arriving_runway, 'STAR': cf.flight_plan_star, 'route': cf.flight_plan_route };
     for (const k of Object.keys(nw)) nw[k] = String(nw[k] || '');
     if (this.siPlan) for (const [k, v] of Object.entries(nw)) {
       const o = this.siPlan[k] || '';
-      if (v !== o) this.changes = this.changes.concat([hmZ(this.utcSecs()) + '  ' + k + ' : ' + (k === 'route' ? 'modifiée' : (o || '—') + ' → ' + (v || '—'))]).slice(-4);
+      if (v !== o) this.changes = this.changes.concat([{ at: hmZ(this.utcSecs()), k, o, v }]).slice(-4);
     }
     this.siPlan = nw;
   }
@@ -363,7 +372,7 @@ class Memo {
     const lines = []; let dep = false, arr = false;
     for (const [lbl, mine, ref, isDep] of [['piste départ', si['piste départ'], val(org.plan_rwy), true], ['SID', si.SID, val(g.sid_ident), true],
       ['piste arrivée', si['piste arrivée'], val(dst.plan_rwy), false], ['STAR', si.STAR, val(g.star_ident), false]]) {
-      if (mine && ref && String(mine).toUpperCase() !== String(ref).toUpperCase()) { lines.push(lbl + ' ' + mine + ' (SimBrief : ' + ref + ')'); if (isDep) dep = true; else arr = true; }
+      if (mine && ref && String(mine).toUpperCase() !== String(ref).toUpperCase()) { lines.push(this.T(lbl) + ' ' + mine + ' (SimBrief' + this.sep() + ref + ')'); if (isDep) dep = true; else arr = true; }
     }
     return { dep, arr, lines };
   }
@@ -411,7 +420,7 @@ class Memo {
       const tr = this.trans;
       if (k === 'sqk' && tr && tr.assigned_code) {
         v = String(tr.assigned_code); empty = false;
-        if (tr.matches_assigned === false) { sub = 'affiché sur le transpondeur : ' + tr.code; bad = true; } else sub = 'conforme';
+        if (tr.matches_assigned === false) { sub = this.T('affiché sur le transpondeur : {0}', tr.code); bad = true; } else sub = 'conforme';
       }
       T.push({ k, label, v, sub, t, empty, bad, alert: !!(e && !e.ack) });
     }
@@ -429,8 +438,13 @@ class Memo {
     const e = this.S.tax;
     T.push({ k: 'tax', label: air ? 'Roulage · inactif en vol' : 'Roulage', v: e ? e.v : '—', sub: air ? 'avion en vol' : e ? '' : 'pas encore donné', t: e ? e.t : null, empty: !e, wide: true, inactive: air });
     const txt = this.clrText(), c = this.S.clr;
-    T.push({ k: 'clr', label: 'Autorisations et procédures  (✔ autorisé · … attendu)', v: txt, sub: c ? '' : 'pas encore donné', t: c ? c.t : null, empty: txt === '—', alert: !!(c && !c.ack), short: this.lastCl, wide: true });
-    for (const t of T) { t.color = COLORS[t.k]; t.bad = !!t.bad; t.alert = !!t.alert; t.inactive = !!t.inactive; }
+    T.push({ k: 'clr', label: 'Autorisations et procédures  (✔ autorisé · … attendu)', v: txt, sub: c ? '' : 'pas encore donné', t: c ? c.t : null, empty: txt === '—', alert: !!(c && !c.ack), short: this.shortCl(), wide: true });
+    for (const t of T) {
+      t.color = COLORS[t.k]; t.bad = !!t.bad; t.alert = !!t.alert; t.inactive = !!t.inactive;
+      if (t.k !== 'clr') t.label = this.P(t.label);
+      if (t.sub) t.sub = this.P(t.sub);
+      if (t.v === 'Libre') t.v = this.T('Libre');
+    }
     return T;
   }
   ack() { for (const k of Object.keys(ALERT)) if (this.S[k]) this.S[k].ack = true; }
@@ -447,42 +461,43 @@ class Memo {
   eta(dist, gs) { return gs < 40 ? '—' : hmZ(this.utcSecs() + dist / gs * 3600); }
   progressOut() {
     const s = this.sim, pts = this.pts, L = [];
-    L.push({ tag: 'sys', label: 'SimConnect', text: ' : ' + (s ? 'connecté à MSFS' : 'non connecté · ' + (this.simMsg || 'en attente')) });
+    const T = (x, ...a) => this.T(x, ...a), S = this.sep();
+    L.push({ tag: 'sys', label: 'SimConnect', text: S + (s ? T('connecté à MSFS') : T('non connecté · {0}', T(this.simMsg || 'en attente'))) });
     const tm = one((this.ofp || {}).times);
-    const plan = [['départ', 'sched_out'], ['décollage', 'sched_off'], ['atterrissage', 'sched_on'], ['arrivée', 'sched_in']].filter(([, k]) => epochHm(tm[k])).map(([n, k]) => n + ' ' + epochHm(tm[k]));
-    if (plan.length) L.push({ tag: 'plan', label: 'Plan (UTC)', text: ' : ' + plan.join(' · ') });
-    const real = [].concat(this.tOff != null ? ['décollage ' + hmZ(this.tOff)] : [], this.tOn != null ? ['atterrissage ' + hmZ(this.tOn)] : []);
-    if (real.length) L.push({ tag: 'real', label: 'Réel (UTC)', text: ' : ' + real.join(' · ') });
+    const plan = [['départ', 'sched_out'], ['décollage', 'sched_off'], ['atterrissage', 'sched_on'], ['arrivée', 'sched_in']].filter(([, k]) => epochHm(tm[k])).map(([n, k]) => T(n) + ' ' + epochHm(tm[k]));
+    if (plan.length) L.push({ tag: 'plan', label: T('Plan (UTC)'), text: S + plan.join(' · ') });
+    const real = [].concat(this.tOff != null ? [T('décollage') + ' ' + hmZ(this.tOff)] : [], this.tOn != null ? [T('atterrissage') + ' ' + hmZ(this.tOn)] : []);
+    if (real.length) L.push({ tag: 'real', label: T('Réel (UTC)'), text: S + real.join(' · ') });
     const si = this.siPlan || {};
     if (Object.values(si).some(Boolean)) {
-      L.push({ tag: 'si', label: 'Plan SayIntentions', text: ' : ' + (si.SID || 'SID ?') + ' · piste ' + (si['piste départ'] || '?') + '  →  ' + (si.STAR || 'STAR ?') + ' · piste ' + (si['piste arrivée'] || '?') });
-      if (si.route) L.push({ tag: 'si', label: 'Route SI', text: ' : ' + si.route.slice(0, 95) });
+      L.push({ tag: 'si', label: T('Plan SayIntentions'), text: S + (si.SID || 'SID ?') + ' · ' + T('piste') + ' ' + (si['piste départ'] || '?') + '  →  ' + (si.STAR || 'STAR ?') + ' · ' + T('piste') + ' ' + (si['piste arrivée'] || '?') });
+      if (si.route) L.push({ tag: 'si', label: T('Route SI'), text: S + si.route.slice(0, 95) });
     }
     const pd = this.planDiff();
-    if (pd.lines.length) L.push({ tag: 'diff', label: 'Écart avec SimBrief', text: ' : ' + pd.lines.join(' · ') + '   (* = tracé SimBrief non mis à jour)' });
-    if (this.changes.length) L.push({ tag: 'chg', label: 'Changements ATC', text: ' : ' + this.changes.slice(-2).join(' | ') });
+    if (pd.lines.length) L.push({ tag: 'diff', label: T('Écart avec SimBrief'), text: S + pd.lines.join(' · ') + '   ' + T('(* = tracé SimBrief non mis à jour)') });
+    if (this.changes.length) L.push({ tag: 'chg', label: T('Changements ATC'), text: S + this.changes.slice(-2).map(c => c.at + '  ' + T(c.k) + S + (c.k === 'route' ? T('modifiée') : (c.o || '—') + ' → ' + (c.v || '—'))).join(' | ') });
     const obs = new Set();
     if (pts.length && (pd.dep || pd.arr)) {
       const ns = []; for (let i = 1; i < pts.length - 1; i++) if (!pts[i].ss) ns.push(i);
       if (ns.length) for (let i = 1; i < pts.length - 1; i++) if (pts[i].ss && ((pd.dep && i < ns[0]) || (pd.arr && i > ns[ns.length - 1]))) obs.add(i);
     }
-    if (s && s.gps_id) L.push({ tag: 'gps', label: 'GPS MSFS', text: ' : prochain ' + s.gps_id + (typeof s.gps_dist_m === 'number' ? ' · ' + Math.round(s.gps_dist_m / 1852) + ' NM' : '') + (s.gps_ete > 0 ? ' · ETE ' + hms(s.gps_ete).slice(0, 5) : '') });
+    if (s && s.gps_id) L.push({ tag: 'gps', label: 'GPS MSFS', text: S + T('prochain') + ' ' + s.gps_id + (typeof s.gps_dist_m === 'number' ? ' · ' + Math.round(s.gps_dist_m / 1852) + ' NM' : '') + (s.gps_ete > 0 ? ' · ETE ' + hms(s.gps_ete).slice(0, 5) : '') });
     let frac = 0, marks = [];
-    if (!pts.length) L.push({ tag: 'sys', label: 'Points de passage', text: ' : renseignez votre identifiant SimBrief (réglages ATC) et générez un plan.' });
+    if (!pts.length) L.push({ tag: 'sys', label: T('Points de passage'), text: S + T('renseignez votre identifiant SimBrief (réglages ATC) et générez un plan.') });
     else if (s && s.lat != null) {
       const gs = s.gs || 0, pr = progress(pts, [s.lat, s.lon], gs);
       if (pr) {
         const n = pr.next, dist = pr.dist; frac = pr.frac;
         marks = pts.map((q, i) => [pr.cum[i] / pr.total, q.id]).filter(([, id]) => id === 'TOC' || id === 'TOD');
-        L.push({ tag: 'next', label: 'Prochain', cols: [pts[n].id, Math.round(dist[n]) + ' NM', this.eta(dist[n], gs) + (obs.has(n) ? '  *' : '')] });
+        L.push({ tag: 'next', label: T('Prochain'), cols: [pts[n].id, Math.round(dist[n]) + ' NM', this.eta(dist[n], gs) + (obs.has(n) ? '  *' : '')] });
         for (const [name, tag] of [['TOC', 'toc'], ['TOD', 'tod']]) {
           const i = pts.findIndex(q => q.id === name);
-          if (i >= 0) L.push({ tag, label: name, cols: i < n ? ['passé'] : ['', Math.round(dist[i]) + ' NM', this.eta(dist[i], gs)] });
+          if (i >= 0) L.push({ tag, label: name, cols: i < n ? [T('passé')] : ['', Math.round(dist[i]) + ' NM', this.eta(dist[i], gs)] });
         }
-        L.push({ tag: 'arr', label: 'Arrivée', cols: ['', Math.round(pr.remaining) + ' NM', this.eta(pr.remaining, gs)] });
+        L.push({ tag: 'arr', label: T('Arrivée'), cols: ['', Math.round(pr.remaining) + ' NM', this.eta(pr.remaining, gs)] });
         for (let i = n + 1; i < Math.min(n + 6, pts.length); i++) L.push({ tag: obs.has(i) ? 'diff' : 'wp', label: '', cols: [pts[i].id, Math.round(dist[i]) + ' NM', this.eta(dist[i], gs) + (obs.has(i) ? '  *' : '')] });
       }
-    } else L.push({ tag: 'sys', label: 'Progression', text: ' : MSFS et SimConnect nécessaires pour suivre le plan (' + pts.length + ' points chargés).' });
+    } else L.push({ tag: 'sys', label: T('Progression'), text: S + T('MSFS et SimConnect nécessaires pour suivre le plan ({0} points chargés).', pts.length) });
     return { lines: L, frac, marks };
   }
   gsxOut() {
@@ -509,15 +524,16 @@ class Memo {
     const hide = this.cfg.mode === 'atc';
     return this.hist.filter(m => !(hide && /^INTERCOM/i.test(m.channel || ''))).slice(-60).reverse().map(m => {
       const atc = disp(m.outgoing_message_english || m.outgoing_message || ''), pil = disp(m.incoming_message_english || m.incoming_message || '');
-      return { id: m.id, t: m.stamp_zulu, who: (/^INTERCOM/i.test(m.channel || '') ? 'Équipage · ' : '') + (m.station_name || m.ident || ''), freq: m.frequency || '', pil, atc, spans: atc ? spans(atc) : [] };
+      return { id: m.id, t: m.stamp_zulu, who: (/^INTERCOM/i.test(m.channel || '') ? this.T('Équipage') + ' · ' : '') + (m.station_name || m.ident || ''), freq: m.frequency || '', pil, atc, spans: atc ? spans(atc) : [] };
     }).filter(x => x.atc || x.pil);
   }
   snapshot() {
     const s = this.sim;
     return {
-      now: Date.now(), status: this.status, head: this.head(), tiles: this.tiles(), hist: this.histOut(), progress: this.progressOut(), gsx: this.gsxOut(),
+      now: Date.now(), status: [this.T(this.status[0], ...this.status.slice(2)), this.status[1]], head: this.head(), tiles: this.tiles(), hist: this.histOut(), progress: this.progressOut(), gsx: this.gsxOut(),
       sim: s ? { zulu: s.zulu, local: s.local, at: this.simAt } : null,
-      cfg: { mode: this.cfg.mode, beep: !!this.cfg.beep, ng: this.cfg.ng, host: this.cfg.host, sb: this.cfg.sb, hasKey: !!this.cfg.key },
+      lang: this.lang(),
+      cfg: { lang: this.cfg.lang || 'auto', mode: this.cfg.mode, beep: !!this.cfg.beep, ng: this.cfg.ng, host: this.cfg.host, sb: this.cfg.sb, hasKey: !!this.cfg.key },
       flight: { orig: this.info.orig || '', dest: this.info.dest || '' },
     };
   }
@@ -577,13 +593,13 @@ class Memo {
   }
   async atis(dep) {
     const icao = dep ? this.info.orig : this.info.dest;
-    if (!icao) return { error: 'Pas encore de vol ou d’aéroport connu.' };
-    if (!this.api) return { error: 'Pas encore de vol SayIntentions.' };
+    if (!icao) return { error: this.T('Pas encore de vol ou d’aéroport connu.') };
+    if (!this.api) return { error: this.T('Pas encore de vol SayIntentions.') };
     const r = await this.sapi('getWX', { icao });
     if (r.error) return { error: String(r.error) };
     const a = (r.airports || [])[0] || {};
     this.wx[icao] = a;
-    const txt = disp(a.atis || 'Pas d’ATIS disponible pour cet aéroport.');
+    const txt = disp(a.atis || this.T('Pas d’ATIS disponible pour cet aéroport.'));
     const info = a.atis ? atisLetter(txt, a) : '';
     const at = atisTime(txt);
     if (info) this.S.atis = { v: info, sub: icao + (dep ? ' · départ' : ' · arrivée') + (at ? ' · ' + at : ''), t: new Date().toISOString(), ack: true };
@@ -688,24 +704,27 @@ function create(dataDir) {
     }
     if (p === '/api/memo/settings') {
       if (req.method === 'POST') {
-        if (!local) { jsonOut(res, 403, { error: 'Réglages modifiables depuis le PC uniquement.' }); return true; }
+        if (!local) { jsonOut(res, 403, { error: memo.T('Réglages modifiables depuis le PC uniquement.') }); return true; }
         const b = await body(req), c = memo.cfg;
         if (typeof b.key === 'string' && b.key.trim()) c.key = b.key.trim();
         for (const k of ['host', 'sb', 'ng']) if (typeof b[k] === 'string') c[k] = b[k].trim() || (k === 'host' ? 'localhost' : k === 'ng' ? 'https://charts.navigraph.com' : '');
         if (b.mode === 'atc' || b.mode === 'all') c.mode = b.mode;
         if (typeof b.beep === 'boolean') c.beep = b.beep;
+        const oldLang = memo.lang();
+        if (b.lang === 'auto' || I18N.CODES.includes(b.lang)) c.lang = b.lang;
+        if (memo.lang() !== oldLang && typeof memo.onLang === 'function') { try { memo.onLang(); } catch (e) { /* ignoré */ } }
         memo.save(); memo.ofpAt = 0; memo.fid = null; memo.tick().catch(() => {});
         jsonOut(res, 200, { ok: true });
-      } else jsonOut(res, 200, { host: memo.cfg.host, sb: memo.cfg.sb, ng: memo.cfg.ng, mode: memo.cfg.mode, beep: !!memo.cfg.beep, hasKey: !!memo.cfg.key, local });
+      } else jsonOut(res, 200, { host: memo.cfg.host, sb: memo.cfg.sb, ng: memo.cfg.ng, mode: memo.cfg.mode, beep: !!memo.cfg.beep, hasKey: !!memo.cfg.key, local, lang: memo.cfg.lang || 'auto', langs: I18N.LANGS });
       return true;
     }
     if (p === '/api/memo/launcher') {
       if (req.method === 'GET') { jsonOut(res, 200, { list: memo.cfg.launch || [], local }); return true; }
-      if (!local) { jsonOut(res, 403, { error: 'Lanceur utilisable depuis le PC uniquement.' }); return true; }
+      if (!local) { jsonOut(res, 403, { error: memo.T('Lanceur utilisable depuis le PC uniquement.') }); return true; }
       const b = await body(req), L = memo.cfg.launch = memo.cfg.launch || [];
       if (b.action === 'browse') {
         let file = '';
-        try { const { dialog } = require('electron'); const r = await dialog.showOpenDialog({ properties: ['openFile'], filters: [{ name: 'Programmes', extensions: ['exe', 'lnk', 'bat'] }, { name: 'Tous', extensions: ['*'] }] }); file = (r.filePaths || [])[0] || ''; } catch (e) { /* hors Electron */ }
+        try { const { dialog } = require('electron'); const r = await dialog.showOpenDialog({ properties: ['openFile'], filters: [{ name: memo.T('Programmes'), extensions: ['exe', 'lnk', 'bat'] }, { name: memo.T('Tous'), extensions: ['*'] }] }); file = (r.filePaths || [])[0] || ''; } catch (e) { /* hors Electron */ }
         jsonOut(res, 200, { path: file }); return true;
       }
       if (b.action === 'add' && b.path) { const clean = String(b.path).trim().replace(/^"|"$/g, ''); L.push({ name: String(b.name || path.win32.parse(clean).name), path: clean, auto: false, pin: false }); }

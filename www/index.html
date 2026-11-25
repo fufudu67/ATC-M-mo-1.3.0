@@ -9,8 +9,13 @@ html,body{margin:0;min-height:100%;background:#0d1b2a;color:#e8eef5;font:15px sy
 <body><div id="atcHost"></div>
 <script>
 (function(){
-  var s=document.createElement('script');s.src='memo-ui.js';
-  s.onload=function(){ if(window.__atcMount) window.__atcMount(document.getElementById('atcHost')); };
-  document.body.appendChild(s);
+  var i=document.createElement('script');i.src='i18n.js';
+  var go=function(){
+    var s=document.createElement('script');s.src='memo-ui.js';
+    s.onload=function(){ if(window.__atcMount) window.__atcMount(document.getElementById('atcHost')); };
+    document.body.appendChild(s);
+  };
+  i.onload=go; i.onerror=go;
+  document.body.appendChild(i);
 })();
 </script></body></html>
