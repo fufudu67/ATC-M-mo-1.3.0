@@ -500,6 +500,74 @@ class Memo {
     } else L.push({ tag: 'sys', label: T('Progression'), text: S + T('MSFS et SimConnect nécessaires pour suivre le plan ({0} points chargés).', pts.length) });
     return { lines: L, frac, marks };
   }
+  /** Bandeau de route (style « départ ─●─ ✈ ─●─ destination ») : tout ce qu'il faut pour le dessiner. */
+  trackOut() {
+    const o = this.ofp || {}, g = one(o.general), org = one(o.origin), dst = one(o.destination), tm = one(o.times);
+    const si = this.siPlan || {}, s = this.sim, pts = this.pts || [], T = (x, ...a) => this.T(x, ...a);
+    const num = x => { const v = parseFloat(val(x)); return Number.isFinite(v) ? v : null; };
+    const ozt = num(tm.orig_timezone), dzt = num(tm.dest_timezone);
+    const loc = (secs, tz) => (secs == null || tz == null) ? '' : hms(((secs + tz * 3600) % 86400 + 86400) % 86400).slice(0, 5) + 'L';
+    const epo = x => { const n = parseInt(val(x), 10); return n > 0 ? n % 86400 : null; };
+    const side = dep => {
+      const a = dep ? org : dst;
+      return { icao: (dep ? this.info.orig : this.info.dest) || val(a.icao_code) || '', name: String(val(a.name) || '').toUpperCase(),
+        rwy: String((dep ? si['piste départ'] : si['piste arrivée']) || val(a.plan_rwy) || '').toUpperCase() };
+    };
+    const dep = side(true), arr = side(false);
+    /* statistiques du plan */
+    const dist = num(g.route_distance) != null ? num(g.route_distance) : num(g.air_distance);
+    const eetS = num(tm.est_time_enroute), fl = num(g.initial_altitude);
+    const ci = val(g.costindex) !== undefined ? val(g.costindex) : val(g.cost_index);
+    const stats = [];
+    if (dist != null) stats.push(Math.round(dist) + ' NM');
+    if (eetS != null) stats.push('EET ' + Math.floor(eetS / 3600) + ':' + pad2(Math.floor(eetS % 3600 / 60)));
+    if (fl != null) stats.push(fl >= 10000 ? 'FL' + String(Math.round(fl / 100)).padStart(3, '0') : th(Math.round(fl)) + ' ft');
+    if (ci !== undefined) stats.push('CI ' + ci);
+    /* points et progression */
+    let points = [], plane = null, next = null, upcoming = [], toc = null, tod = null, eta = null, live = false;
+    let pr = null;
+    if (pts.length >= 2) {
+      const cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + pts[i].leg);
+      const total = cum[cum.length - 1] || 1;
+      if (s && s.lat != null) pr = progress(pts, [s.lat, s.lon], s.gs || 0);
+      if (pr) plane = pr.frac;
+      const gs = s ? s.gs || 0 : 0;
+      points = pts.map((p, i) => ({ id: p.id, f: cum[i] / total, k: p.id === 'TOC' ? 'toc' : p.id === 'TOD' ? 'tod' : 'wp', next: !!(pr && i === pr.next), passed: !!(pr && i < pr.next) }))
+        .filter(p => p.id !== dep.icao && p.id !== arr.icao);
+      if (pr) {
+        const n = pr.next;
+        next = { id: pts[n].id, nm: Math.round(pr.dist[n]), eta: this.eta(pr.dist[n], gs) };
+        for (let i = n + 1; i < Math.min(n + 6, pts.length); i++) upcoming.push({ id: pts[i].id, nm: Math.round(pr.dist[i]), eta: this.eta(pr.dist[i], gs) });
+        for (const [name, set] of [['TOC', v => { toc = v; }], ['TOD', v => { tod = v; }]]) {
+          const i = pts.findIndex(q => q.id === name);
+          if (i >= 0) set(i < n ? { passed: true } : { nm: Math.round(pr.dist[i]), eta: this.eta(pr.dist[i], gs) });
+        }
+        if (gs >= 40) { eta = (this.utcSecs() + pr.remaining / gs * 3600) % 86400; live = true; }
+      }
+    }
+    if (eta == null) eta = epo(tm.sched_in);
+    const std = epo(tm.sched_out);
+    /* état SimConnect, en clair */
+    let simTxt = '';
+    if (!s) {
+      const m = String(this.simMsg || '');
+      simTxt = /0x80004005|non détecté|plus de réponse/i.test(m) ? T('MSFS n’est pas lancé (ou pas encore prêt).')
+        : /introuvable/i.test(m) && /dll/i.test(m) ? T('SimConnect.dll introuvable.') : T(m || 'en attente');
+    }
+    const notes = [];
+    const pd = this.planDiff();
+    if (pd.lines.length) notes.push({ k: 'diff', label: T('Écart avec SimBrief'), text: pd.lines.join(' · ') });
+    if (this.changes.length) notes.push({ k: 'chg', label: T('Changements ATC'), text: this.changes.slice(-2).map(c => c.at + ' ' + T(c.k) + this.sep() + (c.k === 'route' ? T('modifiée') : (c.o || '—') + ' → ' + (c.v || '—'))).join(' | ') });
+    if (s && s.gps_id) notes.push({ k: 'gps', label: 'GPS MSFS', text: s.gps_id + (typeof s.gps_dist_m === 'number' ? ' · ' + Math.round(s.gps_dist_m / 1852) + ' NM' : '') + (s.gps_ete > 0 ? ' · ETE ' + hms(s.gps_ete).slice(0, 5) : '') });
+    return {
+      hasPlan: pts.length >= 2, dep, arr, stats,
+      std: std != null ? { z: hmZ(std), l: loc(std, ozt) } : null,
+      eta: eta != null ? { z: hmZ(eta), l: loc(eta, dzt), live } : null,
+      off: this.tOff != null ? hmZ(this.tOff) : null, on: this.tOn != null ? hmZ(this.tOn) : null,
+      points, plane, next, upcoming, toc, tod,
+      sim: { ok: !!s, text: simTxt }, notes,
+    };
+  }
   gsxOut() {
     const g = (this.sim && this.sim.gsx) || null, s = this.sim, o = this.ofp || {};
     if (!s) return ['GSX : SimConnect non connecté.'];
@@ -530,7 +598,7 @@ class Memo {
   snapshot() {
     const s = this.sim;
     return {
-      now: Date.now(), status: [this.T(this.status[0], ...this.status.slice(2)), this.status[1]], head: this.head(), tiles: this.tiles(), hist: this.histOut(), progress: this.progressOut(), gsx: this.gsxOut(),
+      now: Date.now(), status: [this.T(this.status[0], ...this.status.slice(2)), this.status[1]], head: this.head(), tiles: this.tiles(), hist: this.histOut(), progress: this.progressOut(), track: this.trackOut(), gsx: this.gsxOut(),
       sim: s ? { zulu: s.zulu, local: s.local, at: this.simAt } : null,
       lang: this.lang(),
       cfg: { lang: this.cfg.lang || 'auto', mode: this.cfg.mode, beep: !!this.cfg.beep, ng: this.cfg.ng, host: this.cfg.host, sb: this.cfg.sb, hasKey: !!this.cfg.key },
