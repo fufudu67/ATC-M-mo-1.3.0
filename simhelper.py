@@ -119,6 +119,13 @@ class Reader:
                 self.ok5.append(key)
         if self.ok5:
             d.SimConnect_RequestDataOnSimObject(h, 5, 5, 0, 4, 0, 0, 0, 0)
+        self.reqs = [q for q, on in ((1, True), (2, self.str_ok), (3, bool(self.ok3)), (4, bool(self.ok4)), (5, bool(self.ok5))) if on]
+
+    def rerequest(self):
+        """Redemande les données. Une demande faite dans le menu de MSFS (avant le chargement du vol)
+        ne renvoie parfois jamais rien : on la renouvelle tant que rien n'arrive."""
+        for q in self.reqs:
+            self.dll.SimConnect_RequestDataOnSimObject(self.h, q, q, 0, 4, 0, 0, 0, 0)
 
     def _next(self):
         C = self.C
@@ -195,14 +202,26 @@ def run(make_reader=None, sleep=time.sleep, loops=None):
                 r = Reader(path)
             else:
                 r = make_reader()
-            last = time.time()
+            last = asked = time.time()
+            got = False
+            if hasattr(r, "rerequest"):
+                emit({"status": "waiting"})   # connecté à MSFS, en attente d'un vol chargé
             while True:
                 d = r.poll()
                 if d is not None:
-                    last = time.time()
+                    last = asked = time.time()
+                    got = True
                     emit(gsx_dict(d))
-                elif time.time() - last > 90:   # simulateur en pause ou dans un menu : on attend, sans se reconnecter
-                    raise ConnectionError("plus de réponse de MSFS")
+                else:
+                    now = time.time()
+                    if now - asked > 8 and hasattr(r, "rerequest"):   # rien depuis 8 s (menu, chargement, pause)
+                        r.rerequest()
+                        asked = now
+                        if got and now - last > 8:
+                            emit({"status": "waiting"})
+                            got = False
+                    if now - last > 300:   # 5 min sans rien : on refait une connexion complète
+                        raise ConnectionError("plus de réponse de MSFS")
                 sleep(0.5)
                 if loops is not None:
                     break

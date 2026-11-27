@@ -556,7 +556,8 @@ class Memo {
     let simTxt = '';
     if (!s) {
       const m = String(this.simMsg || '');
-      simTxt = /0x80004005|non détecté|plus de réponse/i.test(m) ? T('MSFS n’est pas lancé (ou pas encore prêt).')
+      simTxt = m === 'waiting' ? T('Connecté à MSFS : en attente d’un vol chargé (pas en pause).')
+        : /0x80004005|non détecté|plus de réponse/i.test(m) ? T('MSFS n’est pas lancé (ou pas encore prêt).')
         : /introuvable/i.test(m) && /dll/i.test(m) ? T('SimConnect.dll introuvable.') : T(m || 'en attente');
     }
     const notes = [];
@@ -570,7 +571,7 @@ class Memo {
       eta: eta != null ? { z: hmZ(eta), l: loc(eta, dzt), live } : null,
       off: this.tOff != null ? hmZ(this.tOff) : null, on: this.tOn != null ? hmZ(this.tOn) : null,
       points, plane, next, upcoming, toc, tod,
-      sim: { ok: !!s, text: simTxt }, notes,
+      sim: { ok: !!s, wait: !s && this.simMsg === 'waiting', text: simTxt }, notes,
     };
   }
   gsxOut() {
@@ -727,6 +728,7 @@ class Memo {
     setInterval(() => { if (this.sim && Date.now() - this.simAt > 6000) this.sim = null; }, 2000);
   }
   onSim(o) {
+    if (o.status) { this.simMsg = o.status === 'waiting' ? 'waiting' : String(o.status); this.sim = null; return; }
     if (o.error) { this.simMsg = o.error; if (!this.sim || Date.now() - this.simAt > 6000) this.sim = null; return; }
     const prev = this.sim; this.sim = o; this.simAt = Date.now(); this.simMsg = '';
     /* the next-frequency alert stops by itself once the instructed frequency is set on a COM radio (active frequency) */
