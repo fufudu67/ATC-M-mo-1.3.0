@@ -98,20 +98,43 @@ button.ghost:hover{border-color:var(--line);color:var(--ink)}
 .clr.alert{border-color:var(--amb);animation:glow 1.1s ease-in-out infinite;cursor:pointer}
 
 /* notes and transcript */
-.trk{background:var(--surf);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:4px}
-.trk .nx{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
-.trk .nx .k{font:600 13px system-ui;color:var(--ink2)}
-.trk .nx .id{font:700 clamp(26px,3.4vw,36px)/1 var(--mono);color:var(--ink)}
-.trk .nx .m{font:600 18px var(--mono);color:var(--ink);font-variant-numeric:tabular-nums}
-.trk .nx .m small{font:500 12px system-ui;color:var(--ink2);margin-left:4px}
-.trk .tb{height:10px;background:var(--glass2);border:1px solid var(--line);border-radius:6px;position:relative;margin:14px 2px 22px}
-.trk .tb i{position:absolute;top:0;bottom:0;left:0;background:var(--amb);border-radius:5px}
-.trk .tb u{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink);text-decoration:none}
-.trk .tb s{position:absolute;top:14px;font:600 11px system-ui;color:var(--ink2);text-decoration:none;transform:translateX(-50%)}
-.trk .rw{display:grid;grid-template-columns:minmax(80px,1.2fr) 1fr 1fr;gap:6px 10px;padding:6px 0;border-top:1px solid var(--line);font:600 14px var(--mono);color:var(--ink);font-variant-numeric:tabular-nums}
-.trk .rw b{font:700 14px var(--mono);color:var(--ink)}
-.trk .rw.pass{color:var(--ink2);opacity:.6}
-.trk .sys{font:500 13.5px system-ui;color:var(--ink2)}
+/* flight tracking: route strip */
+.rt{--rbg:#26211d;--rline:#4a423a;--rgold:#c9a25d;--rink:#f3efe8;--rmut:#a39888;background:var(--rbg);border:1px solid #3a322b;border-radius:12px;padding:16px 20px 14px;margin-top:4px;color:var(--rink)}
+.rt-g{display:grid;grid-template-columns:minmax(120px,auto) 1fr minmax(120px,auto);grid-template-areas:"d m a";gap:22px;align-items:center}
+.rt-e{min-width:0}.rt-e.d{grid-area:d}.rt-e.a{grid-area:a;text-align:right}
+.rt-k{font:700 11.5px system-ui;letter-spacing:.12em;color:var(--rmut);text-transform:uppercase}
+.rt-ic{font:800 clamp(28px,3.4vw,38px)/1.1 var(--mono);letter-spacing:.04em;margin:4px 0 3px}
+.rt-nm{font:500 12.5px system-ui;color:#cfc6b9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px}.rt-e.a .rt-nm{margin-left:auto}
+.rt-t{margin-top:8px;font:700 13px var(--mono);color:var(--rgold);white-space:nowrap}.rt-t small{font:500 11.5px var(--mono);color:var(--rmut);margin-left:6px}
+.rt-t2{font:500 11.5px var(--mono);color:var(--rmut);margin-top:2px}
+.rt-m{grid-area:m;min-width:0}
+.rt-l{position:relative;height:44px;margin:0 8px}
+.rt-l .bs,.rt-l .pg{position:absolute;top:21px;left:0;height:2px;background:var(--rline);right:0}
+.rt-l .pg{background:var(--rgold);right:auto}
+.rt-l .dt{position:absolute;top:22px;width:6px;height:6px;border-radius:50%;background:#e9e4dc;transform:translate(-50%,-50%)}
+.rt-l .dt.big{width:10px;height:10px}
+.rt-l .dt.nx{width:10px;height:10px;background:var(--rgold);box-shadow:0 0 0 3px rgba(201,162,93,.22)}
+.rt-l .en{position:absolute;top:22px;width:18px;height:18px;border-radius:50%;background:var(--rbg);border:3px solid #fff;transform:translate(-50%,-50%)}
+.rt-l .en.f{background:#fff;box-shadow:inset 0 0 0 3px var(--rbg)}
+.rt-l .lb{position:absolute;top:32px;font:700 11px system-ui;letter-spacing:.06em;color:var(--rmut);transform:translateX(-50%);white-space:nowrap}
+.rt-l .lb.nx{color:var(--rgold)}
+.rt-l .pl{position:absolute;top:22px;width:30px;height:30px;border-radius:50%;background:#8a6c3a;border:2px solid var(--rgold);transform:translate(-50%,-50%);display:grid;place-items:center;z-index:2}
+.rt-l .pl svg{width:16px;height:16px;fill:#f6e7c6;transform:rotate(90deg)}
+.rt-s{display:flex;justify-content:center;gap:18px;flex-wrap:wrap;margin-top:12px;font:600 13px var(--mono);color:#d9d1c4;font-variant-numeric:tabular-nums}
+.rt-x{border-top:1px solid #3a322b;margin-top:14px;padding-top:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.rt-c{background:#1f1b18;border:1px solid #3a322b;border-radius:10px;padding:8px 12px;min-width:0}
+.rt-c .rt-k{font-size:10.5px}
+.rt-c .v{font:700 20px/1.2 var(--mono);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rt-c .v.gold{color:var(--rgold)}
+.rt-c .s{font:500 12px var(--mono);color:var(--rmut);margin-top:1px;font-variant-numeric:tabular-nums}
+.rt-w{margin-top:12px;max-width:560px}
+.rt-w .r{display:grid;grid-template-columns:minmax(80px,1.2fr) 1fr 1fr;gap:10px;padding:5px 2px;border-top:1px solid #332c26;font:600 13.5px var(--mono);font-variant-numeric:tabular-nums}
+.rt-w .r span:not(:first-child){color:#cfc6b9;text-align:right}
+.rt-n{margin-top:10px;display:flex;flex-direction:column;gap:4px;font:500 12.5px system-ui;color:#cfc6b9}
+.rt-n b{color:var(--rmut);font-weight:600;margin-right:6px}.rt-n .diff b{color:var(--rgold)}
+.rt-sim{display:flex;align-items:center;gap:8px;margin-top:10px;font:500 12.5px system-ui;color:var(--rmut)}
+.rt-sim::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--bad);flex:none}.rt-sim.ok::before{background:var(--ok)}
+@media (max-width:700px){.rt-g{grid-template-columns:1fr 1fr;grid-template-areas:"d a" "m m";gap:10px 14px}.rt-nm{max-width:none}}
 
 .ainfo{display:inline-block;margin-left:8px;padding:2px 10px;border-radius:8px;background:#6ee7f9;color:#06202a;font:800 .9em var(--mono,monospace);vertical-align:middle}
 details{margin:16px 0 0}
@@ -153,7 +176,7 @@ mark.hd{background:#5ad1e6}mark.al{background:#ffb43c}mark.sp{background:#c9a7ff
   <div class="scroll">
     <div class="banner" id="banner"></div>
     <div class="board" id="grid"></div>
-    <details open data-k="trk"><summary><span data-t="Suivi du vol">Suivi du vol</span></summary><div class="trk" id="trk"></div></details>
+    <details open data-k="trk"><summary><span data-t="Suivi du vol">Suivi du vol</span></summary><div id="trk"></div></details>
     <details open data-k="pad"><summary><span data-t="Scratchpad">Scratchpad</span></summary><textarea id="pad" rows="4" data-tp="Notes de vol…" placeholder="Notes de vol…"></textarea></details>
     <details open data-k="hist"><summary><span data-t="Échanges">Échanges</span> <small id="hcount"></small></summary><ul class="hist" id="hist"></ul></details>
   </div>
@@ -262,26 +285,54 @@ mark.hd{background:#5ad1e6}mark.al{background:#ffb43c}mark.sp{background:#c9a7ff
 <div class="cells">${by.rwd ? rwy(by.rwd) : ''}${by.rwa ? rwy(by.rwa) : ''}${by.dct ? dct(by.dct) : ''}</div>
 ${by.clr ? clrBox(by.clr) : ''}${by.push ? sign(by.push) : ''}${by.tax && !by.tax.inactive ? sign(by.tax) : ''}`;
   }
+  const PLANE = '<svg viewBox="0 0 24 24"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg>';
+  function track(R) {
+    if (!R) return '';
+    const pc = f => (Math.max(0, Math.min(1, f)) * 100).toFixed(2) + '%';
+    const end = (e, dep) => `<div class="rt-e ${dep ? 'd' : 'a'}"><div class="rt-k">${esc(T(dep ? 'Départ' : 'Destination'))}</div><div class="rt-ic">${esc(e.icao || '----')}</div>`
+      + `<div class="rt-nm">${esc([e.name, e.rwy ? 'RWY ' + e.rwy : ''].filter(Boolean).join(' · ') || ' ')}</div>`
+      + (dep ? (R.std ? `<div class="rt-t">STD ${esc(R.std.z)}${R.std.l ? `<small>${esc(R.std.l)}</small>` : ''}</div>` : '') + (R.off ? `<div class="rt-t2">OFF ${esc(R.off)}</div>` : '')
+        : (R.eta ? `<div class="rt-t">ETA ${esc(R.eta.z)}${R.eta.l ? `<small>${esc(R.eta.l)}</small>` : ''}</div>` : '') + (R.on ? `<div class="rt-t2">ON ${esc(R.on)}</div>` : ''))
+      + '</div>';
+    /* line: base, progress, waypoint dots, labels (TOC / TOD / next), endpoints, aircraft */
+    const P = R.points || [], pf = R.plane;
+    let l = '<div class="bs"></div>' + (pf != null ? `<div class="pg" style="width:${pc(pf)}"></div>` : '');
+    const labels = [];
+    for (const p of P) {
+      if (p.f <= 0.003 || p.f >= 0.997) continue;
+      const big = p.k !== 'wp', cl = p.next ? ' nx' : big ? ' big' : '';
+      l += `<i class="dt${cl}" style="left:${pc(p.f)}"></i>`;
+      if (p.next || big) labels.push([p.f, p.id, p.next]);
+    }
+    /* avoid overlapping labels: the next waypoint wins, then TOC/TOD */
+    labels.sort((a, b) => (b[2] - a[2]));
+    const shown = [];
+    for (const lb of labels) if (!shown.some(x => Math.abs(x[0] - lb[0]) < 0.07)) shown.push(lb);
+    l += shown.map(([f, id, nx]) => `<span class="lb${nx ? ' nx' : ''}" style="left:${pc(f)}">${esc(id)}</span>`).join('');
+    l += `<i class="en${pf != null ? ' f' : ''}" style="left:0"></i><i class="en${pf != null && pf >= 0.999 ? ' f' : ''}" style="left:100%"></i>`;
+    if (pf != null) l += `<div class="pl" style="left:${pc(pf)}">${PLANE}</div>`;
+    let h = `<div class="rt"><div class="rt-g">${end(R.dep, true)}<div class="rt-m"><div class="rt-l">${l}</div>`
+      + `<div class="rt-s">${(R.stats || []).map(x => `<span>${esc(x)}</span>`).join('')}</div></div>${end(R.arr, false)}</div>`;
+    /* details */
+    if (R.next) {
+      const chip = (k, v, s, gold) => `<div class="rt-c"><div class="rt-k">${esc(k)}</div><div class="v${gold ? ' gold' : ''}">${esc(v)}</div><div class="s">${esc(s)}</div></div>`;
+      const tt = (n, x) => !x ? '' : x.passed ? chip(n, T('passé'), '') : chip(n, x.nm + ' NM', x.eta + ' ETA');
+      h += `<div class="rt-x">${chip(T('Prochain point'), R.next.id, R.next.nm + ' NM · ' + R.next.eta + ' ETA', true)}${tt('TOC', R.toc)}${tt('TOD', R.tod)}`
+        + (R.eta ? chip(T('Arrivée'), R.eta.z, (R.eta.live ? T('selon la vitesse sol') : T('horaire prévu'))) : '') + '</div>';
+      if (R.upcoming && R.upcoming.length) h += `<div class="rt-w"><div class="rt-k">${esc(T('Points suivants'))}</div>` + R.upcoming.map(w => `<div class="r"><span>${esc(w.id)}</span><span>${esc(w.nm)} NM</span><span>${esc(w.eta)}</span></div>`).join('') + '</div>';
+    }
+    if (R.notes && R.notes.length) h += '<div class="rt-n">' + R.notes.map(n => `<div class="${n.k}"><b>${esc(n.label)}</b>${esc(n.text)}</div>`).join('') + '</div>';
+    const msg = R.sim.ok ? T('connecté à MSFS') : R.sim.text + (R.hasPlan ? ' ' + T('La position de l’avion s’affichera dès que MSFS sera lancé.') : '');
+    h += `<div class="rt-sim${R.sim.ok ? ' ok' : ''}">SimConnect · ${esc(msg)}</div>`;
+    if (!R.hasPlan) h += `<div class="rt-n"><div><b>SimBrief</b>${esc(T('renseignez votre identifiant SimBrief (réglages ATC) et générez un plan.'))}</div></div>`;
+    return h + '</div>';
+  }
   function render() {
     if (!S) return;
     $('head').textContent = S.head;
     const st = $('stat'); st.textContent = S.status[0]; st.className = 'stat' + (S.status[1] ? ' err' : '');
     $('grid').innerHTML = board(S.tiles);
-    try {
-      const P = S.progress || { lines: [], frac: 0, marks: [] }, nx = P.lines.find(l => l.tag === 'next'), t = $('trk');
-      if (!nx) {
-        const m = P.lines.filter(l => l.tag === 'sys' && l.text).map(l => esc(l.label + l.text));
-        t.innerHTML = '<div class="sys">' + (m.join('<br>') || esc(T('Pas de plan de vol.'))) + '</div>';
-      } else {
-        const dist = l => (l.cols.length === 1 ? -1 : l.tag === 'arr' ? 1e9 : parseFloat(l.cols[1]) || 1e8);
-        const rows = P.lines.filter(l => l.cols && l !== nx).sort((a, b) => dist(a) - dist(b)).map(l => {
-          const c = l.cols, pass = c.length === 1;
-          return `<div class="rw${pass ? ' pass' : ''}"><b>${esc(l.tag === 'arr' ? T('Arrivée') : (l.label || c[0]))}</b><span>${esc(pass ? c[0] : c[1] || '')}</span><span>${esc(pass ? '' : c[2] || '')}</span></div>`;
-        }).join('');
-        t.innerHTML = `<div class="nx"><span class="k">${esc(T('Prochain point'))}</span><span class="id">${esc(nx.cols[0])}</span><span class="m">${esc(nx.cols[1])}</span><span class="m">${esc(nx.cols[2])}<small>ETA</small></span></div>`
-          + `<div class="tb"><i style="width:${(P.frac * 100).toFixed(1)}%"></i>${P.marks.map(([f, n]) => `<u style="left:${(f * 100).toFixed(1)}%"></u><s style="left:${(f * 100).toFixed(1)}%">${esc(n)}</s>`).join('')}</div>` + rows;
-      }
-    } catch (e) { console.error('[atc] suivi', e); }
+    try { $('trk').innerHTML = track(S.track); } catch (e) { console.error('[atc] suivi', e); }
     const al = S.tiles.filter(t => t.alert), bn = $('banner');
     if (al.length) { bn.style.display = 'block'; bn.innerHTML = esc(al.map(t => (t.k === 'clr' ? T('Autorisation') : t.k === 'frq' ? T('Fréquence') : t.label.split('  (')[0]) + (t.k === 'clr' && !t.short ? '' : ' ' + (t.short || t.v))).join(' · ')) + '<small>' + esc(T('Nouvelle instruction : touchez pour valider')) + '</small>'; } else bn.style.display = 'none';
     $('fab').classList.toggle('alert', al.length > 0);
