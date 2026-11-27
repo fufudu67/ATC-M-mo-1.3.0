@@ -290,6 +290,10 @@ class Memo {
     } catch (e) { this.status = ['Erreur réseau : {0}', 1, e.message]; }
   }
   start() {
+    /* called on every request by main.js: start the loops and the SimConnect helper ONCE only
+       (before, a new helper process was spawned every 1.5 s, and they knocked each other off SimConnect) */
+    if (this.started) return;
+    this.started = true;
     const loop = async () => { await this.tick(); this.timer = setTimeout(loop, 5000); };
     loop();
     this.startSim();
@@ -372,7 +376,8 @@ class Memo {
     const lines = []; let dep = false, arr = false;
     for (const [lbl, mine, ref, isDep] of [['piste départ', si['piste départ'], val(org.plan_rwy), true], ['SID', si.SID, val(g.sid_ident), true],
       ['piste arrivée', si['piste arrivée'], val(dst.plan_rwy), false], ['STAR', si.STAR, val(g.star_ident), false]]) {
-      if (mine && ref && String(mine).toUpperCase() !== String(ref).toUpperCase()) { lines.push(this.T(lbl) + ' ' + mine + ' (SimBrief' + this.sep() + ref + ')'); if (isDep) dep = true; else arr = true; }
+      const rn = x => String(x).toUpperCase().replace(/^0+(?=\d)/, '');   /* 8L and 08L are the same runway */
+      if (mine && ref && rn(mine) !== rn(ref)) { lines.push(this.T(lbl) + ' ' + mine + ' (SimBrief' + this.sep() + ref + ')'); if (isDep) dep = true; else arr = true; }
     }
     return { dep, arr, lines };
   }
@@ -722,7 +727,7 @@ class Memo {
     setInterval(() => { if (this.sim && Date.now() - this.simAt > 6000) this.sim = null; }, 2000);
   }
   onSim(o) {
-    if (o.error) { this.sim = null; this.simMsg = o.error; return; }
+    if (o.error) { this.simMsg = o.error; if (!this.sim || Date.now() - this.simAt > 6000) this.sim = null; return; }
     const prev = this.sim; this.sim = o; this.simAt = Date.now(); this.simMsg = '';
     /* the next-frequency alert stops by itself once the instructed frequency is set on a COM radio (active frequency) */
     const fq = this.S.frq;

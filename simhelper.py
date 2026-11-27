@@ -134,6 +134,8 @@ class Reader:
             if not addr:
                 break
             hdr = (C.c_uint32 * 10).from_address(addr)  # taille, version, id, requête, objet, définition, drapeaux, n°, sur, nombre
+            if hdr[2] == 3:   # SIMCONNECT_RECV_ID_QUIT : MSFS se ferme
+                raise ConnectionError("MSFS fermé")
             if hdr[2] != 8:   # SIMCONNECT_RECV_ID_SIMOBJECT_DATA
                 continue
             if hdr[3] == 1:
@@ -199,7 +201,7 @@ def run(make_reader=None, sleep=time.sleep, loops=None):
                 if d is not None:
                     last = time.time()
                     emit(gsx_dict(d))
-                elif time.time() - last > 15:
+                elif time.time() - last > 90:   # simulateur en pause ou dans un menu : on attend, sans se reconnecter
                     raise ConnectionError("plus de réponse de MSFS")
                 sleep(0.5)
                 if loops is not None:

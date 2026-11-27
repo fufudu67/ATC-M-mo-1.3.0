@@ -1,7 +1,7 @@
 {
   "name": "atc-memo",
   "productName": "ATC Memo",
-  "version": "2.1.0",
+  "version": "2.1.3",
   "description": "Standalone ATC memo for SayIntentions.AI (flight simulation)",
   "author": "fullenwarth",
   "main": "main.js",
